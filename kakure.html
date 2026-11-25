@@ -1,0 +1,158 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>かくれたところ（試作）</title>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#FAF6EE;--fg:#2B2B2B;--mut:#555;--bl:#3D6FE0;--cr:#FF6B4A;--paper:#FDFCF8}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.7 "Zen Maru Gothic","Hiragino Maru Gothic ProN","Hiragino Sans",system-ui,sans-serif;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;overscroll-behavior:none}
+main{max-width:1180px;margin:auto;padding:16px 16px 48px}
+h1{font-size:1.6rem;line-height:1.35;margin:.4em 0}
+h2{font-size:1.2rem;margin:.3em 0}
+.m{color:var(--mut);font-size:.92rem}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:52px;padding:.4em 1.4em;font:inherit;font-weight:700;border:2px solid var(--fg);border-radius:14px;background:#fff;color:var(--fg);cursor:pointer}
+.btn.p{background:var(--bl);border-color:var(--bl);color:#fff}
+.btn.big{min-height:68px;font-size:1.3rem;padding:.4em 2em}
+.btn:disabled{opacity:.35}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:10px 0}
+.card{background:#fff;border:2px solid var(--fg);border-radius:14px;padding:14px 16px;margin:12px 0}
+.chip{font:inherit;font-weight:700;min-height:46px;padding:.2em 1.1em;border:2px solid var(--fg);border-radius:24px;background:#fff;color:var(--fg);cursor:pointer}
+.chip.on{background:var(--fg);color:#fff}
+.steps{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 8px}
+.steps span{padding:2px 14px;border:2px solid #bbb;border-radius:20px;color:#999;font-weight:700;font-size:.9rem}
+.steps span.on{background:var(--fg);border-color:var(--fg);color:#fff}
+.steps span.ok{border-color:var(--bl);color:var(--bl)}
+.dw{display:grid;grid-template-columns:1fr;gap:14px;align-items:start}
+@media (orientation:landscape) and (min-width:860px){.dw{grid-template-columns:minmax(0,1fr) 280px}}
+.stc{display:flex;justify-content:center}
+.st{position:relative;border:2px solid var(--fg);background:#fff;touch-action:none;width:min(100%,calc((100vh - 150px)*var(--ar)))}
+.st canvas{display:block;width:100%;height:auto}
+.st canvas.top{position:absolute;left:0;top:0;height:100%}
+.ov{position:absolute;inset:0;background:rgba(250,246,238,.86);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:16px}
+.ov .cd{font-size:7rem;font-weight:900;line-height:1}
+#tm{font-size:2.6rem;font-weight:900;font-variant-numeric:tabular-nums;min-width:2.5ch}
+.sw{width:44px;height:44px;border-radius:50%;border:3px solid var(--fg);padding:0;cursor:pointer}
+.sw.on{outline:4px solid var(--fg);outline-offset:2px}
+.szb{width:56px;height:56px;padding:0;display:inline-flex;align-items:center;justify-content:center;border:2px solid var(--fg);border-radius:14px;background:#fff;cursor:pointer}
+.szb.on{background:var(--fg)}.szb i{display:block;border-radius:50%;background:var(--fg)}.szb.on i{background:#fff}
+.tool.on{background:var(--bl);border-color:var(--bl);color:#fff}
+#picked{display:inline-block;width:34px;height:34px;border-radius:50%;border:3px solid var(--fg);vertical-align:middle;background:repeating-conic-gradient(#ddd 0 25%,#fff 0 50%) 0/12px 12px}
+.baton{border-radius:20px;color:#fff;text-align:center;padding:40px 20px;margin:18px 0}
+.baton .s{font-size:1rem;opacity:.9}.baton .b{font-size:2.2rem;font-weight:900;line-height:1.3}
+.cmp{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin:12px 0}
+.cmp figure{margin:0}.cmp canvas,.cmp img{width:100%;height:auto;display:block;border:2px solid var(--fg);background:#fff}
+.cmp figcaption{font-weight:700;color:var(--mut);margin-top:4px}
+.talk{background:#FFF4C8;border:2px dashed var(--fg);border-radius:16px;padding:16px 18px;margin:14px 0}
+.talk p{margin:.3em 0;font-weight:700;font-size:1.1rem}
+</style></head><body><main id="app"></main>
+<script>
+// ── 試作：写真の一部を隠して、隠れたところを想像して描く（保存はしない。端末の中だけで動く）
+const PAL=["#3D6FE0","#FF6B4A","#2B2B2B","#FFFFFF","#FFD166","#2A9D8F","#8D5FD3","#E63946","#F4A340","#6CC04A","#8EC5F0","#F2A0B8","#8B5E3C","#9AA0A6"];
+const SIZES=[4,9,20];
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],app=$("#app");
+["gesturestart","gesturechange","gestureend"].forEach(n=>document.addEventListener(n,e=>e.preventDefault()));
+const S={img:null,W:0,H:0,piece:null,limit:60000,strokes:[],dt:0,round:1};
+let TM=[];const every=(f,ms)=>{const t=setInterval(f,ms);TM.push(t);return t},stopAll=()=>{TM.forEach(clearInterval);TM=[]};
+const steps=k=>`<div class="steps">${["写真を選ぶ","隠す","描く","答え合わせ"].map((s,i)=>`<span class="${i<k?"ok":i==k?"on":""}">${i<k?"✓ ":""}${s}</span>`).join("")}</div>`;
+
+// 写真を読み込む（長辺1600pxまで。位置情報は描き直しで消える）
+async function loadFile(f){const b=await createImageBitmap(f,{imageOrientation:"from-image"}).catch(()=>createImageBitmap(f));
+const s=Math.min(1,1600/Math.max(b.width,b.height)),c=document.createElement("canvas");c.width=Math.round(b.width*s);c.height=Math.round(b.height*s);c.getContext("2d").drawImage(b,0,0,c.width,c.height);
+S.img=c;S.W=c.width;S.H=c.height}
+
+// ちぎった紙のかたち
+function tornPiece(x0,y0,x1,y1){const L=Math.min(S.W,S.H),step=L*.018,amp=L*.012,pts=[];
+const edge=(ax,ay,bx,by,nx,ny)=>{const len=Math.hypot(bx-ax,by-ay),n=Math.max(2,Math.round(len/step));for(let i=0;i<n;i++){const t=i/n,j=(Math.random()*2-1)*amp+(Math.random()<.15?(Math.random()*2-1)*amp*1.6:0);pts.push([ax+(bx-ax)*t+nx*j,ay+(by-ay)*t+ny*j])}};
+edge(x0,y0,x1,y0,0,-1);edge(x1,y0,x1,y1,1,0);edge(x1,y1,x0,y1,0,1);edge(x0,y1,x0,y0,-1,0);return pts}
+function drawPiece(g,pts){if(!pts)return;g.save();g.beginPath();pts.forEach(([x,y],i)=>i?g.lineTo(x,y):g.moveTo(x,y));g.closePath();
+g.shadowColor="rgba(0,0,0,.28)";g.shadowBlur=Math.min(S.W,S.H)*.012;g.shadowOffsetY=Math.min(S.W,S.H)*.004;g.fillStyle="#FDFCF8";g.fill();g.shadowColor="transparent";
+g.lineWidth=Math.max(1,S.W/900);g.strokeStyle="#E3DED2";g.stroke();g.restore()}
+function baseCanvas(withPiece=true){const c=document.createElement("canvas");c.width=S.W;c.height=S.H;const g=c.getContext("2d");g.drawImage(S.img,0,0);if(withPiece)drawPiece(g,S.piece);return c}
+function paintStrokes(g,list){g.clearRect(0,0,S.W,S.H);for(const s of list){g.globalCompositeOperation=s.e?"destination-out":"source-over";g.strokeStyle=s.c;g.lineWidth=s.w;g.lineCap=g.lineJoin="round";g.beginPath();s.p.forEach(([a,b],j)=>j?g.lineTo(a,b):g.moveTo(a,b));if(s.p.length<2)g.lineTo(s.p[0][0]+.1,s.p[0][1]);g.stroke()}g.globalCompositeOperation="source-over"}
+function layer(){const c=document.createElement("canvas");c.width=S.W;c.height=S.H;paintStrokes(c.getContext("2d"),S.strokes);return c}
+const pos=(e,cv)=>{const r=cv.getBoundingClientRect();return[(e.clientX-r.left)*cv.width/r.width,(e.clientY-r.top)*cv.height/r.height]};
+
+// ① 写真を選ぶ
+function home(){stopAll();S.img=null;S.piece=null;S.strokes=[];
+app.innerHTML=`${steps(0)}<h1>かくれたところ、なに描く？</h1>
+<p>撮った人が、写真の一部を紙で隠します。もう一人は、隠れたところに何があったかを想像して描きます。最後に、撮った人が答えを見せます。</p>
+<div class="card"><b>撮った人へ</b><p class="m" style="margin:4px 0">自分で撮った写真を1枚選んでください。隠れたところに「答え」がある写真がおすすめです（何かが写っている、撮った理由がある）。</p></div>
+<input type="file" id="f" accept="image/*" hidden><button class="btn p big" id="b">写真を選ぶ</button><p class="m" id="er"></p>
+<p class="m">写真と絵は、このiPadの中だけで使い、どこにも保存・送信しません。</p>`;
+$("#b").onclick=()=>$("#f").click();
+$("#f").onchange=async e=>{const f=e.target.files[0];if(!f)return;$("#er").textContent="読み込んでいます…";try{await loadFile(f);hide()}catch(x){$("#er").textContent="読み込めませんでした："+x.message}}}
+
+// ② 隠す
+function hide(){stopAll();
+app.innerHTML=`${steps(1)}<div class="dw" style="--ar:${S.W/S.H}"><div class="stc"><div class="st" id="st"><canvas id="cv"></canvas></div></div>
+<div><h2>隠したいところを、指でななめになぞって囲む</h2><p class="m">何回でもやり直せます。写真の4分の1くらいまでがおすすめ。周りが見えている方が、想像しやすくなります。</p>
+<div class="row"><button class="btn" id="rt">ちぎり直す</button></div>
+<div class="row"><button class="btn p big" id="ok" ${S.piece?"":"disabled"} style="width:100%">これで隠す</button></div>
+<div class="row"><button class="btn" id="bk">写真を選び直す</button></div></div></div>`;
+const cv=$("#cv"),g=cv.getContext("2d");cv.width=S.W;cv.height=S.H;let a=null,b=null,rect=null;
+const draw=()=>{g.clearRect(0,0,S.W,S.H);g.drawImage(S.img,0,0);if(a&&b){g.save();g.setLineDash([S.W/60,S.W/90]);g.lineWidth=S.W/250;g.strokeStyle="#FF6B4A";g.strokeRect(Math.min(a[0],b[0]),Math.min(a[1],b[1]),Math.abs(b[0]-a[0]),Math.abs(b[1]-a[1]));g.restore()}else drawPiece(g,S.piece)};draw();
+cv.onpointerdown=e=>{e.preventDefault();cv.setPointerCapture(e.pointerId);a=pos(e,cv);b=a;draw()};
+cv.onpointermove=e=>{if(!a)return;b=pos(e,cv);draw()};
+cv.onpointerup=cv.onpointercancel=()=>{if(!a)return;const w=Math.abs(b[0]-a[0]),h=Math.abs(b[1]-a[1]);if(w>S.W*.04&&h>S.H*.04){rect=[Math.min(a[0],b[0]),Math.min(a[1],b[1]),Math.max(a[0],b[0]),Math.max(a[1],b[1])];S.piece=tornPiece(...rect);$("#ok").disabled=false}a=b=null;draw()};
+$("#rt").onclick=()=>{if(rect){S.piece=tornPiece(...rect);draw()}};
+$("#ok").onclick=handoff;$("#bk").onclick=home}
+
+// バトンタッチ
+function handoff(){stopAll();
+app.innerHTML=`${steps(2)}<div class="baton" style="background:var(--bl)"><div class="s">ここからは</div><div class="b">描く人の番</div></div>
+<p style="font-weight:700;font-size:1.15rem">iPadを描く人に渡してね。撮った人は、画面を見ないでね。</p>
+<div class="card"><b>時間</b><div class="row">${[[30000,"30秒"],[60000,"60秒"],[0,"無制限"]].map(([v,l])=>`<button class="chip${S.limit===v?" on":""}" data-l="${v}">${l}</button>`).join("")}</div></div>
+<button class="btn p big" id="go">受け取った</button>`;
+$$("[data-l]").forEach(b=>b.onclick=()=>{S.limit=+b.dataset.l;$$("[data-l]").forEach(x=>x.classList.toggle("on",x===b))});
+$("#go").onclick=drawScreen}
+
+// ③ 描く
+function drawScreen(){stopAll();S.strokes=[];const T=S.limit;
+app.innerHTML=`${steps(2)}<div class="dw" style="--ar:${S.W/S.H}"><div class="stc"><div class="st" id="st"><canvas id="bs"></canvas><canvas id="dr" class="top"></canvas>
+<div class="ov" id="ov"><div style="font-size:1.4rem;font-weight:900">紙の下には、何があった？</div><div class="m">隠れたところを想像して、描いてみよう。上手さは関係ありません。${T?T/1000+"秒。":"時間は無制限。"}</div><button class="btn p big" id="go">スタート</button></div></div></div>
+<div id="tl"><div class="row"><span id="tm">${T?T/1000:"—"}</span><span class="m">秒</span></div>
+<button class="btn p big" id="fin" disabled style="width:100%">完成</button>
+<div class="row" id="pl">${PAL.map((c,i)=>`<button class="sw${i==0?" on":""}" style="background:${c}" data-c="${c}" aria-label="色"></button>`).join("")}</div>
+<div class="row"><button class="btn tool on" id="pen">ペン</button><button class="btn tool" id="era">消しゴム</button></div>
+<div class="row"><button class="btn tool" id="eye">スポイト</button><span id="picked" title="スポイトで取った色"></span><span class="m">写真の色を取る</span></div>
+<div class="row" id="sz">${SIZES.map((s,i)=>`<button class="szb${i==1?" on":""}" data-s="${s}" aria-label="太さ"><i style="width:${s+4}px;height:${s+4}px"></i></button>`).join("")}</div>
+<div class="row"><button class="btn" id="und">↩ ひとつ戻す</button></div>
+<div class="row"><label><input type="checkbox" id="fg" checked style="width:22px;height:22px;vertical-align:middle"> 指でも描く</label></div>
+<p class="m">Apple Pencilを使うと、手のひらが触れても描かれません。</p></div></div>`;
+const bs=$("#bs"),dr=$("#dr"),x=dr.getContext("2d");bs.width=dr.width=S.W;bs.height=dr.height=S.H;bs.getContext("2d").drawImage(baseCanvas(),0,0);
+let run=false,t0=0,col=PAL[0],sz=SIZES[1],mode="pen",cur=null,curId=null,fg=true,penSeen=false,iv;
+const setMode=m=>{mode=m;["pen","era","eye"].forEach(k=>$("#"+k).classList.toggle("on",k==m))};
+const pick=c=>{col=c;setMode("pen");$$(".sw").forEach(b=>b.classList.toggle("on",b.dataset.c==c))};
+$("#pl").onclick=e=>{const c=e.target.dataset?.c;if(c){pick(c)}};
+$("#pen").onclick=()=>setMode("pen");$("#era").onclick=()=>setMode("era");$("#eye").onclick=()=>setMode("eye");
+$("#picked").onclick=()=>{const c=$("#picked").dataset.c;if(c){col=c;setMode("pen");$$(".sw").forEach(b=>b.classList.remove("on"))}};
+$("#sz").onclick=e=>{const b=e.target.closest(".szb");if(b){sz=+b.dataset.s;$$(".szb").forEach(y=>y.classList.toggle("on",y===b))}};
+$("#und").onclick=()=>{S.strokes.pop();paintStrokes(x,S.strokes)};$("#fg").onchange=e=>fg=e.target.checked;
+const sample=p=>{const X=Math.max(0,Math.min(S.W-1,Math.round(p[0]))),Y=Math.max(0,Math.min(S.H-1,Math.round(p[1])));let d=x.getImageData(X,Y,1,1).data;if(d[3]<200)d=bs.getContext("2d").getImageData(X,Y,1,1).data;
+const hex="#"+[d[0],d[1],d[2]].map(v=>v.toString(16).padStart(2,"0")).join("");$("#picked").style.background=hex;$("#picked").dataset.c=hex;col=hex;$$(".sw").forEach(b=>b.classList.remove("on"));setMode("pen")};
+dr.addEventListener("pointerdown",e=>{if(!run||cur)return;if(e.pointerType==="pen")penSeen=true;if(e.pointerType==="touch"&&(!fg||penSeen))return;e.preventDefault();
+const p=pos(e,dr);if(mode=="eye"){sample(p);return}dr.setPointerCapture(e.pointerId);curId=e.pointerId;cur={c:col,w:Math.max(1,Math.round(sz*S.W/600)),e:mode=="era",p:[p]};S.strokes.push(cur);paintStrokes(x,S.strokes)});
+dr.addEventListener("pointermove",e=>{if(cur&&e.pointerId===curId){cur.p.push(pos(e,dr));paintStrokes(x,S.strokes)}});
+const up=e=>{if(e.pointerId===curId){cur=null;curId=null}};dr.addEventListener("pointerup",up);dr.addEventListener("pointercancel",up);
+$("#go").onclick=()=>{const ov=$("#ov");let n=3;ov.innerHTML=`<div class="cd">${n}</div>`;const t=every(()=>{n--;if(n>0){ov.firstChild.textContent=n;return}clearInterval(t);ov.remove();run=true;t0=performance.now();$("#fin").disabled=false;$("#fin").onclick=fin;
+iv=every(()=>{const el=performance.now()-t0;if(T){const l=T-el;$("#tm").textContent=Math.max(0,Math.ceil(l/1000));if(l<=0)fin()}else $("#tm").textContent=Math.floor(el/1000)},100)},800)};
+function fin(){if(!run)return;run=false;cur=null;stopAll();S.dt=performance.now()-t0;back()}}
+
+// 撮った人に戻す
+function back(){app.innerHTML=`${steps(3)}<div class="baton" style="background:var(--cr)"><div class="s">描けました</div><div class="b">iPadを撮った人に戻してね</div></div>
+<p style="font-weight:700">ふたりで画面を見られるようにして、答え合わせをしよう。</p><button class="btn p big" id="go">答え合わせ</button>`;$("#go").onclick=reveal}
+
+// ④ 答え合わせ
+function reveal(){const L=layer(),A=baseCanvas();A.getContext("2d").drawImage(L,0,0);const O=baseCanvas(false),M=baseCanvas(false);M.getContext("2d").drawImage(L,0,0);
+app.innerHTML=`${steps(4)}<h1>答え合わせ</h1><div class="cmp"><figure id="f1"></figure><figure id="f2"></figure></div>
+<div class="row"><button class="btn" id="ov2">描いた絵を、答えに重ねてみる</button></div>
+<div class="talk"><p>撮った人：隠れていたのは何？　どうして撮った？</p><p>描いた人：どこを手がかりに想像した？</p></div>
+<div class="row"><button class="btn" id="sv">画像を保存</button><button class="btn p big" id="nx">交代して、もう一回</button><button class="btn" id="hm">おわる</button></div>`;
+A.id="ca";O.id="co";$("#f1").append(A);$("#f1").insertAdjacentHTML("beforeend","<figcaption>描いた人の想像</figcaption>");
+$("#f2").append(O);$("#f2").insertAdjacentHTML("beforeend","<figcaption>答え（撮った写真）</figcaption>");
+let over=false;$("#ov2").onclick=()=>{over=!over;$("#f2").replaceChild(over?M:O,$("#f2").querySelector("canvas"));$("#f2 figcaption").textContent=over?"答えに、描いた絵を重ねたもの":"答え（撮った写真）";$("#ov2").textContent=over?"答えだけに戻す":"描いた絵を、答えに重ねてみる"};
+$("#sv").onclick=()=>{const g=Math.round(S.W*.03),c=document.createElement("canvas");c.width=S.W*2+g*3;c.height=S.H+g*2;const k=c.getContext("2d");k.fillStyle="#FAF6EE";k.fillRect(0,0,c.width,c.height);k.drawImage(A,g,g);k.drawImage(O,S.W+g*2,g);
+c.toBlob(b=>{const u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download="kakure_"+new Date().toISOString().slice(0,16).replace(/[:T]/g,"")+".jpg";document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),5000)},"image/jpeg",.9)};
+$("#nx").onclick=home;$("#hm").onclick=()=>{app.innerHTML=`<h1>ありがとうございました</h1><button class="btn p" id="r">はじめから</button>`;$("#r").onclick=home}}
+home();
+</script></body></html>
